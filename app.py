@@ -10,19 +10,17 @@ import seaborn as sns
 st.set_page_config(page_title="Airport Screening Simulation", layout="centered")
 
 # ==========================================
-# 2. SESSION STATE MANAGEMENT
+# 2. SESSION STATE
 # ==========================================
 if 'score' not in st.session_state: st.session_state.score = 0
 if 'rounds' not in st.session_state: st.session_state.rounds = 0
 if 'history' not in st.session_state: st.session_state.history = []
 if 'simulation_active' not in st.session_state: st.session_state.simulation_active = False
-if 'current_bag' not in st.session_state: st.session_state.current_bag = []
-if 'has_threat' not in st.session_state: st.session_state.has_threat = False
 if 'mode' not in st.session_state: st.session_state.mode = "Manual"
 if 'verification_result' not in st.session_state: st.session_state.verification_result = None
 
 # ==========================================
-# 3. ASSET LIBRARY
+# 3. ASSETS
 # ==========================================
 SAFE_ITEMS = ['👕','👖','👗','👟','🎩','💻','📷','📚','🧸','🥪','🕶️']
 THREAT_ITEMS = ['🔫','🔪','💣','🧨','🩸','☠️']
@@ -32,85 +30,78 @@ THREAT_ITEMS = ['🔫','🔪','💣','🧨','🩸','☠️']
 # ==========================================
 
 def generate_bag():
-    """Creates synthetic baggage with 50% threat probability."""
     items = random.sample(SAFE_ITEMS, k=random.randint(4, 8))
     threat = False
     if random.random() < 0.50:
         items.append(random.choice(THREAT_ITEMS))
         threat = True
     random.shuffle(items)
-    st.session_state.current_bag = items
-    st.session_state.has_threat = threat
+    return items, threat
 
 
-def simulated_officer_decision():
+def simulated_officer_decision(mode, has_threat):
     """
-    Simulated decision agent.
-    Manual mode: 70% accuracy baseline.
-    AI-Assisted mode: Black-box AI (85% reliable).
+    Contained simulated decision agent.
+    Manual mode: 70% accuracy.
+    AI-Assisted mode: 85% black-box reliability.
     """
-    if st.session_state.mode == "Manual":
+    if mode == "Manual":
         if random.random() < 0.70:
-            return st.session_state.has_threat
+            return has_threat
         else:
-            return not st.session_state.has_threat
+            return not has_threat
 
-    elif st.session_state.mode == "AI_Assist":
-        # Black-box AI classifier
-        ai_prediction = st.session_state.has_threat
+    elif mode == "AI_Assist":
+        ai_prediction = has_threat
         if random.random() > 0.85:
             ai_prediction = not ai_prediction
-
-        # Simulated officer follows AI advice
         return ai_prediction
 
 
-def process_decision(system_decision):
-    """Logs synthetic decision outcome."""
-    correct = (system_decision == st.session_state.has_threat)
-    result_str = "CORRECT" if correct else "ERROR"
+def run_simulation(mode):
+    history = []
+    score = 0
 
-    if correct:
-        st.session_state.score += 10
+    for round_num in range(1, 11):
+        bag, has_threat = generate_bag()
 
-    st.session_state.history.append({
-        "Round": st.session_state.rounds + 1,
-        "Mode": st.session_state.mode,
-        "Threat": st.session_state.has_threat,
-        "System_Decision": system_decision,
-        "Result": result_str
-    })
+        decision = simulated_officer_decision(mode, has_threat)
 
-    st.session_state.rounds += 1
+        # Synthetic reaction time (no human involved)
+        reaction_time = round(random.uniform(0.4, 2.5), 3)
 
+        correct = (decision == has_threat)
+        if correct:
+            score += 10
 
-def restart():
-    st.session_state.rounds = 0
-    st.session_state.score = 0
-    st.session_state.history = []
-    st.session_state.simulation_active = False
-    st.rerun()
+        history.append({
+            "Round": round_num,
+            "Mode": mode,
+            "Threat_Present": has_threat,
+            "System_Decision": decision,
+            "Correct": correct,
+            "Reaction_Time": reaction_time,
+            "Bag_Contents": " ".join(bag)
+        })
+
+    return pd.DataFrame(history), score
 
 
 def run_system_verification():
-    """Monte Carlo Simulation: 10,000 trials (black-box AI evaluation)."""
     logs = []
-
     for i in range(10000):
         is_threat = random.random() < 0.50
-        ai_prediction = is_threat
-
-        # 85% reliability
+        prediction = is_threat
         if random.random() > 0.85:
-            ai_prediction = not ai_prediction
+            prediction = not prediction
 
         logs.append({
             "Ground_Truth": is_threat,
-            "AI_Prediction": ai_prediction,
-            "Correct": ai_prediction == is_threat
+            "AI_Prediction": prediction,
+            "Correct": prediction == is_threat
         })
 
-    st.session_state.verification_result = pd.DataFrame(logs)
+    return pd.DataFrame(logs)
 
 
 # ==========================================
@@ -118,72 +109,26 @@ def run_system_verification():
 # ==========================================
 
 st.title("Airport Baggage Screening Simulation")
-st.markdown("### Contained Black-Box AI System Model")
+st.markdown("### Contained Black-Box AI Decision-Support Model")
 
 st.info("""
-This application simulates an airport baggage screening system under two configurations:
+This system simulates airport baggage screening under two configurations:
 • Baseline Manual Decision Agent
-• AI-Assisted Decision Support System (Black-Box Classifier)
+• AI-Assisted Black-Box Classifier (85% reliability)
 
-All decisions are generated by a simulated agent.
-No human participant data is collected.
+All decisions and reaction times are synthetically generated.
+No human participant interaction is required.
 """)
 
-# --- MODE SELECTION ---
+st.markdown("#### Target Threat Items")
+threat_html = " ".join([f"<span style='font-size:40px;'>{x}</span>" for x in THREAT_ITEMS])
+st.markdown(f"<div style='text-align:center'>{threat_html}</div>", unsafe_allow_html=True)
+
+st.divider()
+
 col1, col2 = st.columns(2)
 
 with col1:
-    if st.button("Run Baseline Manual Simulation"):
-        st.session_state.mode = "Manual"
-        st.session_state.simulation_active = True
-        st.session_state.history = []
-        st.session_state.rounds = 0
-
-with col2:
-    if st.button("Run AI-Assisted Simulation"):
-        st.session_state.mode = "AI_Assist"
-        st.session_state.simulation_active = True
-        st.session_state.history = []
-        st.session_state.rounds = 0
-
-st.divider()
-
-# --- MONTE CARLO SYSTEM VERIFICATION ---
-if st.button("Run 10,000-Trial Monte Carlo AI Verification"):
-    run_system_verification()
-
-if st.session_state.verification_result is not None:
-    df_ver = st.session_state.verification_result
-    st.subheader("AI Black-Box Performance Audit")
-    st.write(f"Trials: {len(df_ver):,}")
-    st.write(f"Accuracy: {(df_ver['Correct'].mean())*100:.2f}%")
-    st.write(f"Threat Rate: {(df_ver['Ground_Truth'].mean())*100:.2f}%")
-
-st.divider()
-
-# --- SIMULATION LOOP ---
-if st.session_state.simulation_active:
-
-    while st.session_state.rounds < 10:
-        generate_bag()
-        decision = simulated_officer_decision()
-        process_decision(decision)
-
-    st.session_state.simulation_active = False
-
-    st.success(f"Simulation Complete | Mode: {st.session_state.mode}")
-    st.write(f"Final Score: {st.session_state.score}")
-
-    df = pd.DataFrame(st.session_state.history)
-
-    st.subheader("Performance Summary")
-
-    acc = (df["Result"] == "CORRECT").mean() * 100
-    st.write(f"Accuracy: {acc:.2f}%")
-
-    fig, ax = plt.subplots()
-    sns.countplot(data=df, x="Result", ax=ax)
-    st.pyplot(fig)
-
-    if st.button("Reset Simulation"):
-        restart()
+    if st.button("Run Baseline Simulation"):
+        df, score = run_simulation("Manual")
+        st.session_state.histo_
